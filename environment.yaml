@@ -1,0 +1,17 @@
+name: esidlm
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=11.7
+  - ca-certificates
+  - openssl
+  - pytorch-lightning
+  - certifi
+  - tensorboard
+  - pandas
+  - scikit-learn
+prefix: /home/regius/mambaforge/envs/esidlm
