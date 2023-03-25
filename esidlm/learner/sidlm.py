@@ -9,12 +9,12 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader
 
-from esidlm.dataset.widedeep import WideDeepDataset
+from esidlm.dataset.sidlm import SIDLMDataset
 from esidlm.metrics import calc_regression_metric
-from esidlm.models.widedeep import LitWideDeepModel
+from esidlm.models.sidlm import LitSIDLMModel
 
 
-class WideDeepLearner:
+class SIDLMLearner:
 
     def __init__(self, running_config: Dict):
         self.running_config = running_config
@@ -104,14 +104,14 @@ class WideDeepLearner:
             is_train=False
         )
 
-        train_set = WideDeepDataset(x_wide_train, x_cont_train, x_cate_train, 
+        train_set = SIDLMDataset(x_wide_train, x_cont_train, x_cate_train, 
                                     train_data[self.data_config["target_col"]])
-        valid_set = WideDeepDataset(x_wide_valid, x_cont_valid, x_cate_valid,
+        valid_set = SIDLMDataset(x_wide_valid, x_cont_valid, x_cate_valid,
                                     valid_data[self.data_config["target_col"]])
         train_loader = DataLoader(train_set, shuffle=True, **self.dataloader_config)
         valid_loader = DataLoader(valid_set, shuffle=False, **self.dataloader_config)
 
-        model = LitWideDeepModel(
+        model = LitSIDLMModel(
             n_wide=x_wide_train.shape[1],
             n_cont=x_cont_train.shape[1],
             n_cates=[train_data[c].nunique() for c in self.data_config["cate_cols"]],
@@ -134,7 +134,7 @@ class WideDeepLearner:
             cate_data=test_data[self.data_config["cate_cols"]].copy(),
             is_train=False
         )
-        test_set = WideDeepDataset(x_wide_test, x_cont_test, x_cate_test, 
+        test_set = SIDLMDataset(x_wide_test, x_cont_test, x_cate_test, 
                                    test_data[self.data_config["target_col"]])
         test_loader = DataLoader(test_set, shuffle=False, **self.dataloader_config)
 

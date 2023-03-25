@@ -5,17 +5,17 @@ import torch
 import torch.nn as nn
 import torchmetrics
 
-from esidlm.modules.widedeep import WideDeep
+from esidlm.modules.sidlm import SIDLM
 
 
-class LitWideDeepModel(pl.LightningModule):
+class LitSIDLMModel(pl.LightningModule):
 
     def __init__(self, n_wide: int, n_cont: int, n_cates: List[int], model_config: Dict):
         super().__init__()
         self.save_hyperparameters()
         self.model_config = model_config
 
-        self.net = WideDeep(n_wide, n_cont, n_cates, **model_config["net"])
+        self.net = SIDLM(n_wide, n_cont, n_cates, **model_config["net"])
         self.criterion = nn.MSELoss()
         self.metric_r2 = torchmetrics.R2Score()
 

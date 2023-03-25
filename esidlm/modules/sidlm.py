@@ -81,7 +81,7 @@ class Wide(nn.Module):
         return self.linear(x)
 
 
-class WideDeep(nn.Module):
+class SIDLM(nn.Module):
 
     def __init__(self, n_wide: int, n_cont: int, n_cates: List[int], d_embed: int,
                  d_model: int, n_layers: int, p_drop: float, act_fn: str):
@@ -93,27 +93,3 @@ class WideDeep(nn.Module):
     def forward(self, x_wide: torch.Tensor, x_cont: torch.Tensor, x_cate: torch.Tensor):
         x = self.wide(x_wide) + self.deepdense(x_cont, x_cate)
         return x.squeeze(1)
-
-if __name__ == "__main__":
-
-    x_wide = torch.randn(4, 16)
-    x_cont = torch.randn(4, 32)
-    x_cate = torch.LongTensor([
-        [1, 3, 5, 2],
-        [2, 1, 5, 3],
-        [3, 2, 4, 1],
-        [1, 6, 2, 2],
-    ])
-
-    model = WideDeep(
-        n_wide=16,
-        n_cont=32,
-        n_cates=[4, 7, 6, 4],
-        d_embed=32,
-        d_model=128,
-        n_layers=2,
-        p_drop=0.3,
-        act_fn="relu"
-    )
-    x = model(x_wide, x_cont, x_cate)
-    print(x)

@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset
 
 
-class WideDeepDataset(Dataset):
+class SIDLMDataset(Dataset):
 
     def __init__(self, x_wide, x_cont, x_cate, y=None):
         self.x_wide = torch.FloatTensor(x_wide)

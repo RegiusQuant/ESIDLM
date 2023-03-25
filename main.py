@@ -1,4 +1,4 @@
-from esidlm.learner.widedeep import WideDeepLearner
+from esidlm.learner.sidlm import SIDLMLearner
 
 
 WIDEDEEP_TRAINING_CONFIG = {
@@ -68,5 +68,5 @@ WIDEDEEP_TRAINING_CONFIG = {
 
 
 if __name__ == "__main__":
-    learner = WideDeepLearner(WIDEDEEP_TRAINING_CONFIG)
+    learner = SIDLMLearner(WIDEDEEP_TRAINING_CONFIG)
     learner.run_model_training()
