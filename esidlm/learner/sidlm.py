@@ -25,12 +25,21 @@ class SIDLMLearner:
         self.callback_config = running_config.get("callback")
         self.trainer_config = running_config.get("trainer")
 
-        pl.seed_everything(self.global_config["seed"])
+        torch.set_float32_matmul_precision("high")
+        pl.seed_everything(self.global_config.get("seed", 42))
         if not os.path.exists(self.global_config["output_folder"]):
             os.makedirs(self.global_config["output_folder"])
 
+        self.preprocess_folder = os.path.join(self.global_config["output_folder"], "preprocessing")
+        if not os.path.exists(self.preprocess_folder):
+            os.makedirs(self.preprocess_folder)
+
+        self.inference_folder = os.path.join(self.global_config["output_folder"], "inference")
+        if not os.path.exists(self.inference_folder):
+            os.makedirs(self.inference_folder)
+
     def _preprocess_wide_data(self, wide_data: pd.DataFrame, is_train: bool):
-        onehot_encoder_path = os.path.join(self.global_config["output_folder"], "onehot_encoder.pkl")
+        onehot_encoder_path = os.path.join(self.preprocess_folder, "onehot_encoder.pkl")
         
         if is_train:
             onehot_encoder = OneHotEncoder(sparse_output=False)
@@ -45,7 +54,7 @@ class SIDLMLearner:
         return wide_data
     
     def _preprocess_cont_data(self, cont_data: pd.DataFrame, is_train: bool):
-        standard_scaler_path = os.path.join(self.global_config["output_folder"], "standard_scaler.pkl")
+        standard_scaler_path = os.path.join(self.preprocess_folder, "standard_scaler.pkl")
 
         if is_train:
             standard_scaler = StandardScaler()
@@ -60,7 +69,7 @@ class SIDLMLearner:
         return cont_data
     
     def _preprocess_cate_data(self, cate_data: pd.DataFrame, is_train: bool):
-        label_encoders_path = os.path.join(self.global_config["output_folder"], "label_encoders.pkl")
+        label_encoders_path = os.path.join(self.preprocess_folder, "label_encoders.pkl")
 
         cate_cols = cate_data.columns
         if is_train:
@@ -105,9 +114,9 @@ class SIDLMLearner:
         )
 
         train_set = SIDLMDataset(x_wide_train, x_cont_train, x_cate_train, 
-                                    train_data[self.data_config["target_col"]])
+                                 train_data[self.data_config["target_col"]])
         valid_set = SIDLMDataset(x_wide_valid, x_cont_valid, x_cate_valid,
-                                    valid_data[self.data_config["target_col"]])
+                                 valid_data[self.data_config["target_col"]])
         train_loader = DataLoader(train_set, shuffle=True, **self.dataloader_config)
         valid_loader = DataLoader(valid_set, shuffle=False, **self.dataloader_config)
 
@@ -149,4 +158,34 @@ class SIDLMLearner:
 
         test_data[self.data_config["target_col"] + "_PRED"] = y_pred
         test_name = os.path.basename(self.data_config["test_data"]).split(".")[0]
-        test_data.to_csv(os.path.join(self.global_config["output_folder"], f"{test_name}_pred.csv"), index=False)
+        test_folder = os.path.join(self.global_config["output_folder"], "test")
+        if not os.path.exists(test_folder):
+            os.makedirs(test_folder)
+        test_data.to_csv(os.path.join(test_folder, f"{test_name}_pred.csv"), index=False)
+
+    def run_model_inference(self):
+        test_data_paths = os.listdir(self.data_config["inference_folder"])
+        test_data_paths = [os.path.join(self.data_config["inference_folder"], p) for p in test_data_paths]
+        
+        model = LitSIDLMModel.load_from_checkpoint(self.model_config["model_checkpoint_path"])
+        trainer = pl.Trainer(default_root_dir=self.global_config["output_folder"], **self.trainer_config)
+
+        for test_data_path in test_data_paths:
+            test_data = pd.read_csv(test_data_path)
+
+            x_wide_test, x_cont_test, x_cate_test = self._preprocess_input_data(
+                wide_data=test_data[self.data_config["wide_cols"]].copy(),
+                cont_data=test_data[self.data_config["cont_cols"]].copy(),
+                cate_data=test_data[self.data_config["cate_cols"]].copy(),
+                is_train=False
+            )
+
+            test_set = SIDLMDataset(x_wide_test, x_cont_test, x_cate_test)
+            test_loader = DataLoader(test_set, shuffle=False, **self.dataloader_config)
+
+            y_pred = trainer.predict(model, dataloaders=test_loader)
+            y_pred = torch.cat(y_pred, dim=0).cpu().numpy()
+            test_data[self.data_config["target_col"] + "_PRED"] = y_pred
+            test_name = os.path.basename(test_data_path).split(".")[0]
+            test_data.to_csv(os.path.join(self.inference_folder, f"{test_name}_pred.csv"), index=False)
+            print(f"Inference {test_name} Finish.")
