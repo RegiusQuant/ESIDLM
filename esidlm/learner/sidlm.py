@@ -1,99 +1,40 @@
 import os
-import pickle
 from typing import Dict
 
 import pandas as pd
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder, StandardScaler
 from torch.utils.data import DataLoader
 
 from esidlm.dataset.sidlm import SIDLMDataset
+from esidlm.learner.base import BaseLearner
 from esidlm.metrics import calc_regression_metric
 from esidlm.models.sidlm import LitSIDLMModel
+from esidlm.preprocessing import preprocess_onehot_data, preprocess_cont_data, preprocess_cate_data
 
 
-class SIDLMLearner:
+class SIDLMLearner(BaseLearner):
 
     def __init__(self, running_config: Dict):
-        self.running_config = running_config
-        self.global_config = running_config.get("global")
-        self.data_config = running_config.get("data")
-        self.dataloader_config = running_config.get("dataloader")
-        self.model_config = running_config.get("model")
-        self.callback_config = running_config.get("callback")
-        self.trainer_config = running_config.get("trainer")
-
-        torch.set_float32_matmul_precision("high")
-        pl.seed_everything(self.global_config.get("seed", 42))
-        if not os.path.exists(self.global_config["output_folder"]):
-            os.makedirs(self.global_config["output_folder"])
-
-        self.preprocess_folder = os.path.join(self.global_config["output_folder"], "preprocessing")
-        if not os.path.exists(self.preprocess_folder):
-            os.makedirs(self.preprocess_folder)
-
-        self.inference_folder = os.path.join(self.global_config["output_folder"], "inference")
-        if not os.path.exists(self.inference_folder):
-            os.makedirs(self.inference_folder)
-
-    def _preprocess_wide_data(self, wide_data: pd.DataFrame, is_train: bool):
-        onehot_encoder_path = os.path.join(self.preprocess_folder, "onehot_encoder.pkl")
-        
-        if is_train:
-            onehot_encoder = OneHotEncoder(sparse_output=False)
-            wide_data = onehot_encoder.fit_transform(wide_data)
-            with open(onehot_encoder_path, "wb") as f:
-                pickle.dump(onehot_encoder, f)
-        else:
-            with open(onehot_encoder_path, "rb") as f:
-                onehot_encoder = pickle.load(f)
-            wide_data = onehot_encoder.transform(wide_data)
-
-        return wide_data
+        super().__init__(running_config)
     
-    def _preprocess_cont_data(self, cont_data: pd.DataFrame, is_train: bool):
-        standard_scaler_path = os.path.join(self.preprocess_folder, "standard_scaler.pkl")
-
-        if is_train:
-            standard_scaler = StandardScaler()
-            cont_data = standard_scaler.fit_transform(cont_data)
-            with open(standard_scaler_path, "wb") as f:
-                pickle.dump(standard_scaler, f)
-        else:
-            with open(standard_scaler_path, "rb") as f:
-                standard_scaler = pickle.load(f)
-            cont_data = standard_scaler.transform(cont_data)
-
-        return cont_data
-    
-    def _preprocess_cate_data(self, cate_data: pd.DataFrame, is_train: bool):
-        label_encoders_path = os.path.join(self.preprocess_folder, "label_encoders.pkl")
-
-        cate_cols = cate_data.columns
-        if is_train:
-            label_encoders = {}
-            for c in cate_cols:
-                label_encoder = LabelEncoder()
-                cate_data[c] = label_encoder.fit_transform(cate_data[c])
-                label_encoders[c] = label_encoder
-            with open(label_encoders_path, "wb") as f:
-                pickle.dump(label_encoders, f)
-        else:
-            with open(label_encoders_path, "rb") as f:
-                label_encoders = pickle.load(f)
-            for c in cate_cols:
-                cate_data[c] = label_encoders[c].transform(cate_data[c])
-
-        cate_data = cate_data.values
-        return cate_data
-    
-    def _preprocess_input_data(self, wide_data: pd.DataFrame, cont_data: pd.DataFrame,
-                               cate_data: pd.DataFrame, is_train: bool):
-        wide_data = self._preprocess_wide_data(wide_data, is_train)
-        cont_data = self._preprocess_cont_data(cont_data, is_train)
-        cate_data = self._preprocess_cate_data(cate_data, is_train)
+    def _preprocess_input_data(self, input_data: pd.DataFrame, is_train: bool):
+        wide_data = preprocess_onehot_data(
+            input_data=input_data[self.data_config["wide_cols"]].copy(),
+            file_path=os.path.join(self.preprocess_folder, "onehot_encoder.pkl"),
+            is_train=is_train
+        )
+        cont_data = preprocess_cont_data(
+            input_data=input_data[self.data_config["cont_cols"]].copy(),
+            file_path=os.path.join(self.preprocess_folder, "standard_scaler.pkl"),
+            is_train=is_train
+        )
+        cate_data = preprocess_cate_data(
+            input_data=input_data[self.data_config["cate_cols"]].copy(),
+            file_path=os.path.join(self.preprocess_folder, "label_encoders.pkl"),
+            is_train=is_train
+        )
         return wide_data, cont_data, cate_data
 
     def run_model_training(self):
@@ -101,15 +42,11 @@ class SIDLMLearner:
         valid_data = pd.read_csv(self.data_config["valid_data"])
 
         x_wide_train, x_cont_train, x_cate_train = self._preprocess_input_data(
-            wide_data=train_data[self.data_config["wide_cols"]].copy(),
-            cont_data=train_data[self.data_config["cont_cols"]].copy(),
-            cate_data=train_data[self.data_config["cate_cols"]].copy(),
+            input_data=train_data,
             is_train=True
         )
         x_wide_valid, x_cont_valid, x_cate_valid = self._preprocess_input_data(
-            wide_data=valid_data[self.data_config["wide_cols"]].copy(),
-            cont_data=valid_data[self.data_config["cont_cols"]].copy(),
-            cate_data=valid_data[self.data_config["cate_cols"]].copy(),
+            input_data=valid_data,
             is_train=False
         )
 
@@ -138,9 +75,7 @@ class SIDLMLearner:
 
         test_data = pd.read_csv(self.data_config["test_data"])
         x_wide_test, x_cont_test, x_cate_test = self._preprocess_input_data(
-            wide_data=test_data[self.data_config["wide_cols"]].copy(),
-            cont_data=test_data[self.data_config["cont_cols"]].copy(),
-            cate_data=test_data[self.data_config["cate_cols"]].copy(),
+            input_data=test_data,
             is_train=False
         )
         test_set = SIDLMDataset(x_wide_test, x_cont_test, x_cate_test, 
@@ -172,11 +107,8 @@ class SIDLMLearner:
 
         for test_data_path in test_data_paths:
             test_data = pd.read_csv(test_data_path)
-
             x_wide_test, x_cont_test, x_cate_test = self._preprocess_input_data(
-                wide_data=test_data[self.data_config["wide_cols"]].copy(),
-                cont_data=test_data[self.data_config["cont_cols"]].copy(),
-                cate_data=test_data[self.data_config["cate_cols"]].copy(),
+                input_data=test_data,
                 is_train=False
             )
 
