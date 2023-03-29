@@ -120,4 +120,29 @@ class SOPiNetLearner(BaseLearner):
         test_data.to_csv(os.path.join(test_folder, f"{test_name}_pred.csv"), index=False)
 
     def run_model_inference(self):
-        pass
+        test_data_paths = os.listdir(self.data_config["inference_folder"])
+        test_data_paths = [os.path.join(self.data_config["inference_folder"], p) for p in test_data_paths]
+        
+        model = LitSOPiNetModel.load_from_checkpoint(self.model_config["model_checkpoint_path"])
+        trainer = pl.Trainer(default_root_dir=self.global_config["output_folder"], **self.trainer_config)
+
+        for test_data_path in test_data_paths:
+            test_data = pd.read_csv(test_data_path)
+            x_cont_test, x_cate_test, x_time_test = self._preprocess_input_data(
+                input_data=test_data,
+                is_train=False
+            )
+
+            test_set = SOPiNetDataset(x_cont_test, x_cate_test, x_time_test)
+            test_loader = DataLoader(test_set, shuffle=False, **self.dataloader_config)
+
+            y_preds = trainer.predict(model, dataloaders=test_loader)
+            y_preds = torch.cat(y_preds, dim=0).cpu().numpy()
+
+            for target_idx, target_col in enumerate(self.data_config["target_cols"]):
+                y_pred = y_preds[:, target_idx]
+                test_data[target_col + "_PRED"] = y_pred
+
+            test_name = os.path.basename(test_data_path).split(".")[0]
+            test_data.to_csv(os.path.join(self.inference_folder, f"{test_name}_pred.csv"), index=False)
+            print(f"Inference {test_name} Finish.")
