@@ -154,8 +154,9 @@ SOPINET_TRAINING_CONFIG = {
     "model": {
         "net": {
             "d_embed": 32,
-            "d_model": 128,
-            "n_layers": 2,
+            "d_model": 256,
+            "n_layers": 1,
+            "n_head": 4,
             "p_drop": 0.3,
             "act_fn": "relu"
         },
@@ -175,13 +176,13 @@ SOPINET_TRAINING_CONFIG = {
         "early_stopping": {
             "monitor": "valid_loss",
             "mode": "min",
-            "patience": 5,
+            "patience": 10,
             "verbose": True
         }
     },
 
     "trainer": {
-        "max_epochs": 20,
+        "max_epochs": 50,
         "accelerator": "gpu",
         "devices": 1,
         "deterministic": True
