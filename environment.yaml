@@ -1,5 +1,7 @@
 name: esidlm
 channels:
+  - pytorch
+  - nvidia
   - conda-forge
 dependencies:
   - python=3.9
@@ -14,4 +16,4 @@ dependencies:
   - tensorboard
   - pandas
   - scikit-learn
-prefix: /home/regius/mambaforge/envs/esidlm
+
