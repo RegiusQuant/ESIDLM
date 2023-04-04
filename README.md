@@ -1,3 +1,6 @@
+![image](https://github.com/RegiusQuant/ESIDLM/blob/main/docs/images/title.jpg)
+---
+
 # ESIDLM
 Enhanced Spatial-Temporal Interpretable Deep Learning Model
 
