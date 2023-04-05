@@ -1,4 +1,4 @@
-![image](https://github.com/RegiusQuant/ESIDLM/blob/main/docs/images/title.jpg)
+![image](https://github.com/RegiusQuant/ESIDLM/blob/main/docs/images/bnu-logo.bmp)
 ---
 
 # ESIDLM
