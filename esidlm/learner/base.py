@@ -1,4 +1,5 @@
 import os
+import shutil
 from abc import ABC, abstractmethod
 from typing import Dict
 
@@ -29,6 +30,11 @@ class BaseLearner(ABC):
         self.inference_folder = os.path.join(self.global_config["output_folder"], "inference")
         if not os.path.exists(self.inference_folder):
             os.makedirs(self.inference_folder)
+            
+        self.interpretation_folder = os.path.join(self.global_config["output_folder"], "interpretation")
+        if os.path.exists(self.interpretation_folder):
+            shutil.rmtree(self.interpretation_folder)
+        os.makedirs(self.interpretation_folder)
 
     @abstractmethod
     def run_model_training(self):
@@ -36,4 +42,8 @@ class BaseLearner(ABC):
     
     @abstractmethod
     def run_model_inference(self):
+        raise NotImplementedError
+    
+    @abstractmethod
+    def run_model_interpretation(self):
         raise NotImplementedError

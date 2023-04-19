@@ -1,4 +1,6 @@
 import os
+import pickle
+import shutil
 from typing import Dict
 
 import pandas as pd
@@ -6,6 +8,7 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from esidlm.dataset.sidlm import SIDLMDataset
 from esidlm.learner.base import BaseLearner
@@ -121,3 +124,34 @@ class SIDLMLearner(BaseLearner):
             test_name = os.path.basename(test_data_path).split(".")[0]
             test_data.to_csv(os.path.join(self.inference_folder, f"{test_name}_pred.csv"), index=False)
             print(f"Inference {test_name} Finish.")
+
+    def run_model_interpretation(self):
+        model = LitSIDLMModel.load_from_checkpoint(self.model_config["model_checkpoint_path"])
+
+        with open(os.path.join(self.preprocess_folder, "onehot_encoder.pkl"), "rb") as f:
+            onehot_encoder = pickle.load(f)
+        wide_features = []
+        for i, feature_name in enumerate(onehot_encoder.feature_names_in_):
+            for v in onehot_encoder.categories_[i]:
+                wide_features.append(f"{feature_name}_{v}")
+        wide_weights = model.net.wide.linear.weight.squeeze().detach().numpy()
+        wide_data = pd.DataFrame({
+            "WIDE_FEATURE": wide_features,
+            "WIDE_WEIGHT": wide_weights
+        })
+        wide_data.to_csv(os.path.join(self.interpretation_folder, "wide_data.csv"), index=False)
+
+        writer = SummaryWriter(self.interpretation_folder)
+        cate_embedding = model.net.deepdense.embed_layer.embedding.weight
+        category_offsets = model.net.deepdense.embed_layer.category_offsets.detach().numpy()
+        with open(os.path.join(self.preprocess_folder, "label_encoders.pkl"), "rb") as f:
+            label_encoders = pickle.load(f)
+        for i, c in enumerate(self.data_config["cate_cols"]):
+            label_encoder = label_encoders[c]
+            writer.add_embedding(
+                cate_embedding[category_offsets[i]: category_offsets[i] + len(label_encoder.classes_)],
+                metadata=label_encoder.classes_,
+                tag=f"Categorical Embedding {c}",
+                global_step=0
+            )
+        writer.close()
