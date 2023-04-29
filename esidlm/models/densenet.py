@@ -6,6 +6,7 @@ import torch.nn as nn
 import torchmetrics
 
 from esidlm.modules.densenet import EntityDenseNet
+from esidlm.modules.loss.rel import RelativeErrorLoss
 
 
 class LitEntityDenseNetModel(pl.LightningModule):
@@ -16,7 +17,14 @@ class LitEntityDenseNetModel(pl.LightningModule):
         self.model_config = model_config
 
         self.net = EntityDenseNet(n_cont, n_cates, **model_config["net"])
-        self.criterion = nn.MSELoss()
+        
+        if "loss" not in model_config or model_config["loss"]["name"] == "mse":
+            self.criterion = nn.MSELoss()
+        elif model_config["loss"]["name"] == "rel":
+            self.criterion = RelativeErrorLoss(model_config["loss"]["a"], model_config["loss"]["b"])
+        else:
+            raise ValueError("Loss not Supported!")
+
         self.metric_r2 = torchmetrics.R2Score()
 
     def forward(self, batch):

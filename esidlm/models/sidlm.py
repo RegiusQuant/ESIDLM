@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torchmetrics
 
+from esidlm.modules.loss.rel import RelativeErrorLoss
 from esidlm.modules.sidlm import SIDLM
 
 
@@ -16,7 +17,14 @@ class LitSIDLMModel(pl.LightningModule):
         self.model_config = model_config
 
         self.net = SIDLM(n_wide, n_cont, n_cates, **model_config["net"])
-        self.criterion = nn.MSELoss()
+
+        if "loss" not in model_config or model_config["loss"]["name"] == "mse":
+            self.criterion = nn.MSELoss()
+        elif model_config["loss"]["name"] == "rel":
+            self.criterion = RelativeErrorLoss(model_config["loss"]["a"], model_config["loss"]["b"])
+        else:
+            raise ValueError("Loss not Supported!")
+        
         self.metric_r2 = torchmetrics.R2Score()
 
     def forward(self, batch):
